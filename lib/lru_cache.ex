@@ -9,6 +9,7 @@ defmodule LruCache do
   """
 
   use GenServer
+  defstruct capacity: 0
 
   ### Client API
  
@@ -20,8 +21,8 @@ defmodule LruCache do
       iex> LruCache.create()
 
   """
-  def create() do
-    GenServer.start_link(__MODULE__, [], name: :lru_cache_genserver)
+  def create(capacity \\ 3) do
+    GenServer.start_link(__MODULE__, [capacity], name: :lru_cache_genserver)
   end 
 
   @doc """
@@ -78,29 +79,58 @@ defmodule LruCache do
   end 
 
   ### Server Callbacks
+
+  #TODO: remove, just for testing
+  def display_entire_cache() do
+    :ets.tab2list(:cache_table)
+    :ets.tab2list(:position_table)
+  end
   
-  def init(init_arg) do
-    :ets.new(:foo, [:set, :named_table, :public])
-    {:ok, init_arg}
+  def init(capacity) do
+    :ets.new(:cache_table, [:named_table, :public]) 
+    :ets.new(:position_table, [:named_table, :ordered_set])
+    %LruCache{capacity: capacity} 
+    {:ok, capacity}
   end
 
-  def handle_call({:put, key, value}, _from, items) do
-    result = :ets.insert_new(:foo, {key, value})
-    {:reply, result, items}
+  def handle_call({:put, key, value}, _from, lru_state) do
+    result = :ets.insert_new(:cache_table, {key, value})
+    update_item_position(key)
+    remove_least_recently_used(lru_state)
+    {:reply, result, lru_state}
   end
 
-  def handle_call({:get, key}, _from, items) do
-      result = :ets.lookup(:foo, key)
+  def handle_call({:get, key}, _from, lru_state) do
+      result = :ets.lookup(:cache_table, key)
       case result do
-        [{_, val}] -> # key in cache
-          {:reply, val, items}
+        [{_, val}] -> 
+          update_item_position(key)
+          {:reply, val, lru_state}
         [] -> # key not found in cache
-          {:reply, nil, items}
+          {:reply, nil, lru_state}
       end
   end
 
-  def handle_call({:delete, key}, _from, items) do
-    result = :ets.delete(:foo, key)
-    {:reply, result, items}
+  def handle_call({:delete, key}, _from, lru_state) do
+    result = :ets.delete(:cache_table, key)
+    :ets.delete(:position_table, key)
+    {:reply, result, lru_state}
+  end
+
+  defp remove_least_recently_used(lru_state) do
+    # if we exceed capacity remove least recently used item
+    num_items = :ets.info(:cache_table, :size)
+    if num_items > 3 do 
+      lru_key = :ets.first(:position_table)
+      :ets.delete(:position_table, lru_key)
+      :ets.delete(:cache_table, lru_key)
+    end
+  end
+
+  defp update_item_position(key) do
+    # Puts item in back of table
+    counter = :erlang.unique_integer([:monotonic])
+    :ets.delete(:position_table, key)
+    :ets.insert(:position_table, {key, counter})
   end
 end

@@ -122,19 +122,16 @@ defmodule LruCache do
     num_items = :ets.info(:position_table, :size)
     if num_items > lru_state.capacity do 
       time_key = :ets.first(:cache_table)
-      {key, value} = :ets.lookup(:position_table, time_key)
-      IO.puts("______")
-      IO.puts(key)
-      IO.puts("______")
-      :ets.delete(:cache_table, key)
-      :ets.delete(:position_table, time_key)
+      [{_, {key, _val}}] = :ets.lookup(:cache_table, time_key)
+      :ets.delete(:cache_table, time_key)
+      :ets.delete(:position_table, key)
     end
   end
 
   defp update_item_position(key, time_key) do
     # Puts item in back of table
     counter = :erlang.unique_integer([:monotonic])
-    [{_, val}] = :ets.lookup(:cache_table, time_key)
+    [{_, {_key, val}}] = :ets.lookup(:cache_table, time_key)
     :ets.delete(:cache_table, time_key)
     :ets.insert(:cache_table, {counter, {key, val}})
     :ets.insert(:position_table, {key, counter})

@@ -3,7 +3,7 @@ defmodule LruCacheTest do
   doctest LruCache
 
   setup do
-    {:ok,server_pid} = LruCache.create()
+    {:ok,server_pid} = LruCache.create(3)
     {:ok,server: server_pid}
   end
 
@@ -26,6 +26,44 @@ defmodule LruCacheTest do
 
     LruCache.delete("abc")
     assert LruCache.get("abc") == nil
+  end
+
+  test "tests adding when at capacity will remove item that was lru" do
+    LruCache.put("a", "1")
+    LruCache.put("b", "2")
+    LruCache.put("c", "3")
+    LruCache.put("d", "4")
+
+    assert LruCache.get("a") == nil
+    assert LruCache.get("b") == "2"
+    assert LruCache.get("c") == "3"
+    assert LruCache.get("d") == "4"
+  end
+
+  test "tests fetching an item will reset its position" do
+    LruCache.put("a", "1")
+    LruCache.put("b", "2")
+    LruCache.put("c", "3")
+    LruCache.get("a")
+    LruCache.put("d", "4")
+
+    assert LruCache.get("a") == "1"
+    assert LruCache.get("b") == nil
+    assert LruCache.get("c") == "3"
+    assert LruCache.get("d") == "4"
+  end
+
+  test "tests deleting an item frees up room" do
+    LruCache.put("a", "1")
+    LruCache.put("b", "2")
+    LruCache.put("c", "3")
+    LruCache.delete("c")
+    LruCache.put("d", "4")
+
+    assert LruCache.get("a") == "1"
+    assert LruCache.get("b") == "2"
+    assert LruCache.get("c") == nil
+    assert LruCache.get("d") == "4"
   end
 end
 

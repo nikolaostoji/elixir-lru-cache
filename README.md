@@ -1,7 +1,5 @@
 # LruCache
 
-**TODO: Add description**
-
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
@@ -19,3 +17,10 @@ Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_do
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/lru_cache](https://hexdocs.pm/lru_cache).
 
+## How to run
+
+Go to lib directory and run "iex lru_cache.ex":
+  * LruCache.create()/LruCache.create(10) - default value is 5
+  * LruCache.put("test-key", 123) - to add to cache
+  * LruCache.get("test-key") - to get value from cache
+  * LruCache.delete("test-key) - to delete item from cache

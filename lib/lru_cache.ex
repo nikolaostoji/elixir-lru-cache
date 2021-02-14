@@ -9,6 +9,7 @@ defmodule LruCache do
   """
 
   use GenServer
+  defstruct capacity: 0
 
   ### Client API
  
@@ -20,8 +21,8 @@ defmodule LruCache do
       iex> LruCache.create()
 
   """
-  def create() do
-    GenServer.start_link(__MODULE__, [], name: :lru_cache_genserver)
+  def create(capacity \\ 5) when is_integer(capacity) do
+    GenServer.start_link(__MODULE__, capacity, name: :lru_cache_genserver)
   end 
 
   @doc """
@@ -79,28 +80,62 @@ defmodule LruCache do
 
   ### Server Callbacks
   
-  def init(init_arg) do
-    :ets.new(:foo, [:set, :named_table, :public])
-    {:ok, init_arg}
+  def init(capacity) do
+    :ets.new(:position_table, [:named_table, :public]) # kvp = {key: key, value: key_time }
+    :ets.new(:cache_table, [:named_table, :ordered_set]) # kvp = {key: key_time, time: value}
+    lru_state = %LruCache{capacity: capacity} 
+    {:ok, lru_state}
   end
 
-  def handle_call({:put, key, value}, _from, items) do
-    result = :ets.insert_new(:foo, {key, value})
-    {:reply, result, items}
+  def handle_call({:put, key, value}, _from, lru_state) do
+    wasUpdated = insert_kvp(key, value)
+    remove_least_recently_used(lru_state)
+    {:reply, wasUpdated, lru_state}
   end
 
-  def handle_call({:get, key}, _from, items) do
-      result = :ets.lookup(:foo, key)
-      case result do
-        [{_, val}] -> # key in cache
-          {:reply, val, items}
+  def handle_call({:get, key}, _from, lru_state) do
+      
+    time_result = :ets.lookup(:position_table, key)
+      case time_result do
+        [{_, time_key}] -> 
+          val = update_item_position(key, time_key)
+          {:reply, val, lru_state}
         [] -> # key not found in cache
-          {:reply, nil, items}
+          {:reply, nil, lru_state}
       end
   end
 
-  def handle_call({:delete, key}, _from, items) do
-    result = :ets.delete(:foo, key)
-    {:reply, result, items}
+  def handle_call({:delete, key}, _from, lru_state) do
+    result = :ets.delete(:position_table, key)
+    :ets.delete(:cache_table, key)
+    {:reply, result, lru_state}
+  end
+
+  defp remove_least_recently_used(lru_state) do
+    # if we exceed capacity remove least recently used item
+    num_items = :ets.info(:position_table, :size)
+    if num_items > lru_state.capacity do 
+      time_key = :ets.first(:cache_table)
+      [{_, {key, _val}}] = :ets.lookup(:cache_table, time_key)
+      :ets.delete(:cache_table, time_key)
+      :ets.delete(:position_table, key)
+    end
+  end
+
+  defp update_item_position(key, time_key) do
+    # Puts item in back of table
+    counter = :erlang.unique_integer([:monotonic])
+    [{_, {_key, val}}] = :ets.lookup(:cache_table, time_key)
+    :ets.delete(:cache_table, time_key)
+    :ets.insert(:cache_table, {counter, {key, val}})
+    :ets.insert(:position_table, {key, counter})
+    val
+  end
+
+  defp insert_kvp(key, value) do
+    counter = :erlang.unique_integer([:monotonic])
+    wasUpdated = :ets.insert(:position_table, {key, counter})
+    :ets.insert(:cache_table, {counter, {key, value}})
+    wasUpdated
   end
 end

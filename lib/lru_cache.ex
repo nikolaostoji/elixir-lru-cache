@@ -22,7 +22,7 @@ defmodule LruCache do
 
   """
   def create(capacity \\ 3) do
-    GenServer.start_link(__MODULE__, [capacity], name: :lru_cache_genserver)
+    GenServer.start_link(__MODULE__, capacity, name: :lru_cache_genserver)
   end 
 
   @doc """
@@ -89,8 +89,8 @@ defmodule LruCache do
   def init(capacity) do
     :ets.new(:cache_table, [:named_table, :public]) 
     :ets.new(:position_table, [:named_table, :ordered_set])
-    %LruCache{capacity: capacity} 
-    {:ok, capacity}
+    lru_state = %LruCache{capacity: capacity} 
+    {:ok, lru_state}
   end
 
   def handle_call({:put, key, value}, _from, lru_state) do
@@ -120,7 +120,7 @@ defmodule LruCache do
   defp remove_least_recently_used(lru_state) do
     # if we exceed capacity remove least recently used item
     num_items = :ets.info(:cache_table, :size)
-    if num_items > 3 do 
+    if num_items > lru_state.capacity do 
       lru_key = :ets.first(:position_table)
       :ets.delete(:position_table, lru_key)
       :ets.delete(:cache_table, lru_key)

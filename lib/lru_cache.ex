@@ -82,29 +82,29 @@ defmodule LruCache do
 
   #TODO: remove, just for testing
   def display_entire_cache() do
-    :ets.tab2list(:cache_table)
     :ets.tab2list(:position_table)
+    :ets.tab2list(:cache_table)
   end
   
   def init(capacity) do
-    :ets.new(:cache_table, [:named_table, :public]) 
-    :ets.new(:position_table, [:named_table, :ordered_set])
+    :ets.new(:position_table, [:named_table, :public]) # kvp = {key: key, value: key_time }
+    :ets.new(:cache_table, [:named_table, :ordered_set]) # kvp = {key: key_time, time: value}
     lru_state = %LruCache{capacity: capacity} 
     {:ok, lru_state}
   end
 
   def handle_call({:put, key, value}, _from, lru_state) do
-    result = :ets.insert_new(:cache_table, {key, value})
-    update_item_position(key)
+    wasUpdated = insert_kvp(key, value)
     remove_least_recently_used(lru_state)
-    {:reply, result, lru_state}
+    {:reply, wasUpdated, lru_state}
   end
 
   def handle_call({:get, key}, _from, lru_state) do
-      result = :ets.lookup(:cache_table, key)
-      case result do
-        [{_, val}] -> 
-          update_item_position(key)
+      
+    time_result = :ets.lookup(:position_table, key)
+      case time_result do
+        [{_, time_key}] -> 
+          val = update_item_position(key, time_key)
           {:reply, val, lru_state}
         [] -> # key not found in cache
           {:reply, nil, lru_state}
@@ -112,25 +112,39 @@ defmodule LruCache do
   end
 
   def handle_call({:delete, key}, _from, lru_state) do
-    result = :ets.delete(:cache_table, key)
-    :ets.delete(:position_table, key)
+    result = :ets.delete(:position_table, key)
+    :ets.delete(:cache_table, key)
     {:reply, result, lru_state}
   end
 
   defp remove_least_recently_used(lru_state) do
     # if we exceed capacity remove least recently used item
-    num_items = :ets.info(:cache_table, :size)
+    num_items = :ets.info(:position_table, :size)
     if num_items > lru_state.capacity do 
-      lru_key = :ets.first(:position_table)
-      :ets.delete(:position_table, lru_key)
-      :ets.delete(:cache_table, lru_key)
+      time_key = :ets.first(:cache_table)
+      {key, value} = :ets.lookup(:position_table, time_key)
+      IO.puts("______")
+      IO.puts(key)
+      IO.puts("______")
+      :ets.delete(:cache_table, key)
+      :ets.delete(:position_table, time_key)
     end
   end
 
-  defp update_item_position(key) do
+  defp update_item_position(key, time_key) do
     # Puts item in back of table
     counter = :erlang.unique_integer([:monotonic])
-    :ets.delete(:position_table, key)
+    [{_, val}] = :ets.lookup(:cache_table, time_key)
+    :ets.delete(:cache_table, time_key)
+    :ets.insert(:cache_table, {counter, {key, val}})
     :ets.insert(:position_table, {key, counter})
+    val
+  end
+
+  defp insert_kvp(key, value) do
+    counter = :erlang.unique_integer([:monotonic])
+    wasUpdated = :ets.insert(:position_table, {key, counter})
+    :ets.insert(:cache_table, {counter, {key, value}})
+    wasUpdated
   end
 end

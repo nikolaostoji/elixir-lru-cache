@@ -21,7 +21,7 @@ defmodule LruCache do
       iex> LruCache.create()
 
   """
-  def create(capacity \\ 5) do
+  def create(capacity \\ 5) when is_integer(capacity) do
     GenServer.start_link(__MODULE__, capacity, name: :lru_cache_genserver)
   end 
 
@@ -79,12 +79,6 @@ defmodule LruCache do
   end 
 
   ### Server Callbacks
-
-  #TODO: remove, just for testing
-  def display_entire_cache() do
-    :ets.tab2list(:position_table)
-    :ets.tab2list(:cache_table)
-  end
   
   def init(capacity) do
     :ets.new(:position_table, [:named_table, :public]) # kvp = {key: key, value: key_time }

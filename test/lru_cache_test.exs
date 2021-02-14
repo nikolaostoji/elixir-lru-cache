@@ -3,7 +3,7 @@ defmodule LruCacheTest do
   doctest LruCache
 
   setup do
-    {:ok,server_pid} = LruCache.create(5)
+    {:ok,server_pid} = LruCache.create(3)
     {:ok,server: server_pid}
   end
 

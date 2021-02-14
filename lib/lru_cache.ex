@@ -21,7 +21,7 @@ defmodule LruCache do
       iex> LruCache.create()
 
   """
-  def create(capacity \\ 3) do
+  def create(capacity \\ 5) do
     GenServer.start_link(__MODULE__, capacity, name: :lru_cache_genserver)
   end 
 
